@@ -24,7 +24,7 @@ from pydantic import BaseModel
 
 from auth.dependencies import get_current_user, get_token_from_request
 from db.observability import obs_writer
-from db.pool import close_pool, init_pool
+from db.pool import close_pool, get_pool, init_pool
 from db.repository.auth import UserRecord, auth_repo
 from pipeline.request_context import RequestContext, clear_request_context, get_request_context, set_request_context
 from rag.indexer import embed_missing_chunks, index_manuals
