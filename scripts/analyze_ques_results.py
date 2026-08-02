@@ -29,6 +29,7 @@ RAG_EXPECT = {
     "R17": ["400-800-9588", "complaint@"],
     "R20": ["100"],
     "R21": ["100"],
+    "M06": ["23", "50"],
 }
 
 ZHANGSAN_IDS = {"T01", "T02", "M01", "M02", "M03", "M04", "M07", "W01", "W02"}
@@ -100,9 +101,14 @@ def analyze(data: dict) -> str:
         if qid == "A04" and "XYZ789" not in reply:
             issues.append(f"**A04** 未看到 lisi 订单 XYZ789")
 
-        # M07 不要过度改签
-        if qid == "M07" and "改签" in reply and "转接" in reply:
-            issues.append(f"**M07** 用户要求只查状态，仍出现改签/转接话术")
+        # M07 只查状态：不得出现「改签/转接」话术，也不得声称无工具
+        if qid == "M07":
+            if "改签" in reply and "转接" in reply:
+                issues.append(f"**M07** 用户要求只查状态，仍出现改签/转接话术")
+            if any(k in reply for k in ("不包含", "没有工具", "无法查询", "没有直接查询", "没有该工具")):
+                issues.append(f"**M07** 声称无航班状态工具或拒绝查询")
+            if "PA441" not in reply or ("延误" not in reply and "状态" not in reply):
+                issues.append(f"**M07** 未给出 PA441 实际状态")
 
         # 内部转接旁白
         if "转接至分诊" in reply or "让我为您转接" in reply:
