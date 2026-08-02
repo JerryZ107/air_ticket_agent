@@ -1,0 +1,8 @@
+{"id": "owner_can_read_own", "owner": "user_a", "actor": "user_a", "action": "load_thread", "expect": "ok"}
+{"id": "cross_user_thread_read_denied", "owner": "user_a", "actor": "user_b", "action": "load_thread", "expect": "not_found"}
+{"id": "cross_user_items_denied", "owner": "user_a", "actor": "user_b", "action": "load_thread_items", "expect": "not_found"}
+{"id": "cross_user_save_thread_rejected", "owner": "user_a", "actor": "user_b", "action": "save_thread", "expect": "not_found"}
+{"id": "thread_list_filtered_by_owner", "owner": "user_a", "actor": "user_a", "action": "load_threads", "expect": "own_only"}
+{"id": "thread_list_excludes_other", "owner": "user_a", "actor": "user_b", "action": "load_threads", "expect": "not_listed"}
+{"id": "anonymous_internal_call_allowed", "owner": "user_a", "actor": "anonymous", "action": "load_thread", "expect": "ok"}
+{"id": "cross_user_delete_denied", "owner": "user_a", "actor": "user_b", "action": "delete_thread", "expect": "not_found"}

@@ -1,0 +1,3 @@
+{"id": "user_own", "actor": "zhangsan", "confirmation": "ABC123", "expect": "allow"}
+{"id": "user_other", "actor": "lisi", "confirmation": "ABC123", "expect": "deny"}
+{"id": "admin_other", "actor": "admin", "confirmation": "ABC123", "expect": "allow", "on_behalf": true}

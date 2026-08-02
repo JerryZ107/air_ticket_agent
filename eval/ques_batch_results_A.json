@@ -1,0 +1,63 @@
+{
+  "started_at": "2026-08-01T15:54:28.594318+00:00",
+  "finished_at": "2026-08-01T15:54:53.032123+00:00",
+  "base_url": "http://127.0.0.1:8002",
+  "total": 4,
+  "ok": 4,
+  "failed": 0,
+  "include_destructive": false,
+  "results": [
+    {
+      "id": "A01",
+      "user": "admin",
+      "category": "admin-on-behalf",
+      "source": null,
+      "destructive": false,
+      "question": "查询旅客zhangsan名下有哪些订单？",
+      "status_code": 200,
+      "elapsed_ms": 8357,
+      "thread_id": "thr_d269140c",
+      "reply": "旅客 **zhangsan** 名下目前有 1 个订单：\n\n| 确认号 | 航班 | 行程 | 座位 | 状态 |\n|--------|------|------|------|------|\n| **ABC123** | NY900 | 纽约 (JFK) → 奥斯汀 (AUS) | 15A | 已确认 (confirmed) |\n\n请问您需要针对这个订单进行什么操作？例如改签、取消、换座等，请随时告诉我。",
+      "ok": true
+    },
+    {
+      "id": "A02",
+      "user": "admin",
+      "category": "admin-on-behalf",
+      "source": null,
+      "destructive": false,
+      "question": "列出系统里最近订单，并说明每条订单属于哪位旅客用户名",
+      "status_code": 200,
+      "elapsed_ms": 9969,
+      "thread_id": "thr_3bdd43ff",
+      "reply": "好的，我先为您查询系统里的最近订单。系统目前共有 **2 条最近订单**，明细如下：\n\n| 序号 | 旅客用户名 | 确认号 | 航班 | 航线 | 座位 | 状态 |\n|------|-----------|--------|------|------|------|------|\n| 1 | **zhangsan** | ABC123 | NY900 | New York (JFK) → Austin (AUS) | 15A | 已确认 (confirmed) |\n| 2 | **lisi** | XYZ789 | NY802 | New York (JFK) → Austin (AUS) | 8C | 已取消 (cancelled) |\n\n---\n\n**总结：**\n- **zhangsan** 的订单 ABC123（NY900）目前状态正常，已确认。\n- **lisi** 的订单 XYZ789（NY802）已被取消。\n\n请问您需要对哪条订单进行操作？",
+      "ok": true
+    },
+    {
+      "id": "A03",
+      "user": "lisi",
+      "category": "auth",
+      "source": null,
+      "destructive": false,
+      "question": "我要代旅客zhangsan查询订单列表",
+      "status_code": 200,
+      "elapsed_ms": 4321,
+      "thread_id": "thr_bb446a4d",
+      "reply": "抱歉，当前系统仅允许管理员查询指定旅客的订单，您无法代查其他旅客（如 zhangsan）的订单列表。\n\n如果您是本人已登录用户，可以直接告诉我“查我的订单”，我可以为您查询；或者您可以联系管理员协助处理。还有什么可以帮您的吗？",
+      "ok": true
+    },
+    {
+      "id": "A04",
+      "user": "admin",
+      "category": "admin-on-behalf",
+      "source": null,
+      "destructive": false,
+      "question": "帮我查旅客lisi的订单确认号是多少？",
+      "status_code": 200,
+      "elapsed_ms": 1705,
+      "thread_id": "thr_4d15b6f4",
+      "reply": "无法处理该确认号",
+      "ok": true
+    }
+  ]
+}

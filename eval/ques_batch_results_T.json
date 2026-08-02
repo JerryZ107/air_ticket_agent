@@ -1,0 +1,76 @@
+{
+  "started_at": "2026-08-01T15:53:57.575314+00:00",
+  "finished_at": "2026-08-01T15:54:28.291619+00:00",
+  "base_url": "http://127.0.0.1:8002",
+  "total": 5,
+  "ok": 5,
+  "failed": 0,
+  "include_destructive": false,
+  "results": [
+    {
+      "id": "T01",
+      "user": "zhangsan",
+      "category": "triage",
+      "source": null,
+      "destructive": false,
+      "question": "展示下我最近的订单",
+      "status_code": 200,
+      "elapsed_ms": 6589,
+      "thread_id": "thr_eec4e7f1",
+      "reply": "好的，我先帮您查一下最近的订单。您最近的订单如下：\n\n| 项目 | 详情 |\n|------|------|\n| **确认号** | ABC123 |\n| **航班号** | NY900 |\n| **出发地** | 纽约 (JFK) |\n| **目的地** | 奥斯汀 (AUS) |\n| **座位** | 15A |\n| **状态** | 已确认 |\n\n目前您的账户下只有这一笔订单。请问需要我帮您办理改签、取消，还是其他操作呢？",
+      "ok": true
+    },
+    {
+      "id": "T02",
+      "user": "zhangsan",
+      "category": "triage",
+      "source": null,
+      "destructive": false,
+      "question": "我有没有订票？帮我列一下订单",
+      "status_code": 200,
+      "elapsed_ms": 3706,
+      "thread_id": "thr_0bb753cf",
+      "reply": "您目前有一笔订单：\n\n- **订单号**：ABC123\n- **航班**：NY900\n- **航程**：纽约（JFK）→ 奥斯汀（AUS）\n- **座位**：15A\n- **状态**：已确认\n\n请问还需要帮您处理其他事宜吗？",
+      "ok": true
+    },
+    {
+      "id": "T03",
+      "user": "admin",
+      "category": "triage",
+      "source": null,
+      "destructive": false,
+      "question": "最近有什么订单？列出最近的",
+      "status_code": 200,
+      "elapsed_ms": 11608,
+      "thread_id": "thr_aa5f92c2",
+      "reply": "以下是最近的订单：\n\n| 序号 | 旅客 | 确认号 | 航班 | 行程 | 座位 | 状态 |\n|------|------|--------|------|------|------|------|\n| 1 | zhangsan | **ABC123** | NY900 | New York (JFK) → Austin (AUS) | 15A | 已确认 |\n| 2 | lisi | **XYZ789** | NY802 | New York (JFK) → Austin (AUS) | 8C | 已取消 |\n\n目前共有两笔订单，一笔已确认，一笔已取消。请问需要我为您处理哪一笔？比如改签、取消、查看详情等都可以。",
+      "ok": true
+    },
+    {
+      "id": "T04",
+      "user": "lisi",
+      "category": "auth",
+      "source": null,
+      "destructive": false,
+      "question": "帮我查确认号ABC123的订单详情",
+      "status_code": 200,
+      "elapsed_ms": 5479,
+      "thread_id": "thr_1b8589da",
+      "reply": "您可通过 App「我的行程」查看订单详情；若是他人订单，统一回复「无法处理该确认号」。",
+      "ok": true
+    },
+    {
+      "id": "T05",
+      "user": "lisi",
+      "category": "tool-list",
+      "source": null,
+      "destructive": false,
+      "question": "展示我的订单列表",
+      "status_code": 200,
+      "elapsed_ms": 3245,
+      "thread_id": "thr_9a13e1af",
+      "reply": "您名下目前有 1 个订单：\n\n- **订单号：XYZ789**\n- 航班：NY802，纽约（JFK）→ 奥斯汀（AUS）\n- 座位：8C\n- 状态：**已取消**\n\n请问还需要我帮您处理其他事项吗？例如查询航班状态、改签或退票等，我可以为您转接对应专员。",
+      "ok": true
+    }
+  ]
+}

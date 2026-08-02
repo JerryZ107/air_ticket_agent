@@ -1,0 +1,24 @@
+{
+  "started_at": "2026-08-01T08:40:35.508982+00:00",
+  "finished_at": "2026-08-01T08:40:43.670900+00:00",
+  "base_url": "http://127.0.0.1:8001",
+  "total": 1,
+  "ok": 1,
+  "failed": 0,
+  "include_destructive": false,
+  "results": [
+    {
+      "id": "T03",
+      "user": "admin",
+      "category": "triage",
+      "source": null,
+      "destructive": false,
+      "question": "最近有什么订单？列出最近的",
+      "status_code": 200,
+      "elapsed_ms": 8063,
+      "thread_id": "thr_9ef83d41",
+      "reply": "好的，我马上为您查询最近的订单。以下是最近的订单列表：\n\n| 序号 | 旅客 | 确认号 | 航班 | 路线 | 座位 | 状态 |\n|------|------|--------|------|------|------|------|\n| 1 | zhangsan | **ABC123** | NY900 | New York (JFK) → Austin (AUS) | 15A | ✅ 已确认 |\n| 2 | lisi | **XYZ789** | NY802 | New York (JFK) → Austin (AUS) | 8C | ❌ 已取消 |\n\n目前系统中共有 2 个订单，其中 1 个已确认、1 个已取消。请问您需要对这些订单进行什么操作？比如改签、取消、换座等，我都可以帮您处理。",
+      "ok": true
+    }
+  ]
+}

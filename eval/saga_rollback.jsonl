@@ -1,0 +1,1 @@
+{"id": "rebook_step3_fail", "confirmation": "ABC123", "inject_failure_at_step": 3, "expect_status": "confirmed", "expect_same_confirmation": true}

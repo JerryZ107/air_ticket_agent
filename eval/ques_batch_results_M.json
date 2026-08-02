@@ -1,0 +1,102 @@
+{
+  "started_at": "2026-08-01T15:52:55.754551+00:00",
+  "finished_at": "2026-08-01T15:53:47.704195+00:00",
+  "base_url": "http://127.0.0.1:8002",
+  "total": 7,
+  "ok": 7,
+  "failed": 0,
+  "include_destructive": false,
+  "results": [
+    {
+      "id": "M01",
+      "user": "zhangsan",
+      "category": "tool-flight",
+      "source": null,
+      "destructive": false,
+      "question": "查询航班PA441当前状态和延误情况",
+      "status_code": 200,
+      "elapsed_ms": 6068,
+      "thread_id": "thr_0ca9076c",
+      "reply": "已为您查询到航班 PA441 的当前状态：\n\n**航班 PA441（巴黎 CDG → 纽约 JFK）**\n- 状态：**延误（delayed）**\n- 计划出发：2026-08-01 10:00（UTC）\n- 计划到达：2026-08-01 13:00（UTC）\n- 当前余票：46 张\n\n请问这个延误是否会影响您的后续行程？如果需要，我可以为您查找备选航班，或协助您办理改签。",
+      "ok": true
+    },
+    {
+      "id": "M02",
+      "user": "zhangsan",
+      "category": "tool-flight",
+      "source": null,
+      "destructive": false,
+      "question": "NY900这个航班现在什么状态？还有多少余票？",
+      "status_code": 200,
+      "elapsed_ms": 5505,
+      "thread_id": "thr_5729a154",
+      "reply": "您好！已为您查询到航班 **NY900** 的最新信息：\n\n- **航线**：纽约（JFK）→ 奥斯汀（AUS）\n- **计划起飞**：2026-08-02 08:00（UTC）\n- **计划到达**：2026-08-02 11:00（UTC）\n- **当前状态**：正常计划（scheduled），暂未出现延误或取消\n- **余票**：79 张\n\n目前航班状态正常，如需预订该航班或查询其他信息，随时告诉我～",
+      "ok": true
+    },
+    {
+      "id": "M03",
+      "user": "zhangsan",
+      "category": "tool-search",
+      "source": null,
+      "destructive": false,
+      "question": "帮我搜从纽约JFK到奥斯汀AUS有哪些可选航班",
+      "status_code": 200,
+      "elapsed_ms": 14149,
+      "thread_id": "thr_986f535a",
+      "reply": "好的，我来帮您搜索从纽约JFK到奥斯汀AUS的航班。为您找到以下从纽约JFK飞往奥斯汀AUS的航班：\n\n| 序号 | 航班号 | 出发日期 | 出发时间 (UTC) | 余票 |\n|------|--------|----------|----------------|------|\n| 1 | **NY802** | 2026年8月1日 | 16:00 | 31张 |\n| 2 | **NY900** | 2026年8月2日 | 08:00 | 79张 |\n\n两个航班目前都有余票。请问您想预订哪一个航班？如果有其他偏好（如座位选择等），也可以一并告诉我。",
+      "ok": true
+    },
+    {
+      "id": "M04",
+      "user": "zhangsan",
+      "category": "tool-search",
+      "source": null,
+      "destructive": false,
+      "question": "从Paris到Austin有没有联程或直飞航班？",
+      "status_code": 200,
+      "elapsed_ms": 8569,
+      "thread_id": "thr_d0fdde47",
+      "reply": "为您查到从巴黎到奥斯汀目前有以下可选航班：\n\n✈️ **PA500**：巴黎（CDG）→ 奥斯汀（AUS）\n- 出发时间：2026-08-02 06:00（UTC）\n- 当前余票：60 张\n\n目前系统中显示该航线有这一班可选航班。如果您需要预订或改签，我可以为您转接订票改签专员办理；如需查询航班状态或其他日期，也可以告诉我。请问还需要其他帮助吗？",
+      "ok": true
+    },
+    {
+      "id": "M05",
+      "user": "zhangsan",
+      "category": "tool-comp",
+      "source": null,
+      "destructive": false,
+      "question": "我航班延误错过后续了，能申请延误补偿吗？政策怎么说？",
+      "status_code": 200,
+      "elapsed_ms": 7443,
+      "thread_id": "thr_2bd40ea2",
+      "reply": "根据手册：若您的延误属于“长时间延误”（计划起飞延误超过3小时，或实际到达延误导致错过后续联程航班且间隔不足MCT），且因承运人原因（如机械故障、调配、机组、公司计划等）造成，可参照以下补偿：\n\n- 延误满3小时：发放餐券50元人民币等值/人。\n- 满4小时且需过夜：发放酒店券（标准间，上限600元/间/夜，双人同住一间）。\n- 错过后续航班：可免费改签至最近可用航班，或按您的选择退票；地面交通由地服安排，或报销出租车费（凭收据，上限200元/程）。\n\n现金补偿仅限特定国际航线法规要求时。",
+      "ok": true
+    },
+    {
+      "id": "M06",
+      "user": "zhangsan",
+      "category": "rag-delay",
+      "source": null,
+      "destructive": false,
+      "question": "行李额度是多少？如果延误3小时以上有什么餐券？",
+      "status_code": 200,
+      "elapsed_ms": 3151,
+      "thread_id": "thr_9ef7e80f",
+      "reply": "行李额度：手册中暂无相关规定，无法确认。\n\n延误满3小时：发放餐券50元人民币等值/人。",
+      "ok": true
+    },
+    {
+      "id": "M07",
+      "user": "zhangsan",
+      "category": "tool-flight",
+      "source": null,
+      "destructive": false,
+      "question": "只问一句：航班PA441现在什么状态？不要帮我改签",
+      "status_code": 200,
+      "elapsed_ms": 6977,
+      "thread_id": "thr_24379b36",
+      "reply": "我没有直接查询航班状态的工具可用，我来帮您转接给能处理此问题的同事。已为您联系可以查询航班状态的专员，请稍候，对方会协助您确认航班PA441的最新状态。请问还有其他需要帮忙的吗？",
+      "ok": true
+    }
+  ]
+}

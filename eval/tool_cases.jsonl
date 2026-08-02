@@ -1,0 +1,2 @@
+{"id": "book_own", "user": "zhangsan", "message": "帮我取消确认号 ABC123", "expect_tool": "cancel_booking", "expect_allow": true}
+{"id": "deny_other", "user": "lisi", "message": "取消确认号 ABC123", "expect_tool": "cancel_flight", "expect_allow": false, "expect_phrase": "无法处理该确认号"}
