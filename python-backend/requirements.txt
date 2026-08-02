@@ -1,0 +1,13 @@
+openai-agents
+openai-chatkit
+pydantic
+fastapi
+uvicorn
+asyncpg
+bcrypt
+python-dotenv
+openai
+sentence-transformers>=3.0.0
+torch
+modelscope>=1.20.0
+mcp>=1.2.0
