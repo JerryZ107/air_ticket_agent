@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "airline-booking": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "cwd": "${workspaceFolder}/openai-cs-agents-demo-main/python-backend",
+      "env": {
+        "DATABASE_URL": "postgresql://airline:airline@localhost:5432/airline",
+        "AIRLINE_MCP_ACTOR": "zhangsan"
+      }
+    }
+  }
+}
