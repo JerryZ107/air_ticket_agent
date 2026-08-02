@@ -371,6 +371,26 @@ class AirlineServer(ChatKitServer[dict[str, Any]]):
                 await self._broadcast_state(thread, context)
                 return
 
+            if (
+                route.confidence >= 0.85
+                and route.target_agent == "Flight Information Agent"
+            ):
+                from pipeline.flight_direct import answer_flight_status
+
+                reply = await answer_flight_status(user_text)
+                if reply:
+                    state.input_items.append({"role": "assistant", "content": reply})
+                    yield ThreadItemDoneEvent(
+                        item=AssistantMessageItem(
+                            id=self.store.generate_item_id("message", thread, context),
+                            thread_id=thread.id,
+                            created_at=datetime.now(),
+                            content=[AssistantMessageContent(text=reply)],
+                        )
+                    )
+                    await self._broadcast_state(thread, context)
+                    return
+
             if state.context.user_id and route.target_agent != "FAQ Agent":
                 from airline.hydrate import hydrate_first_booking
 
