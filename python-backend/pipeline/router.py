@@ -79,6 +79,11 @@ async def classify_and_route(user_text: str) -> RouteDecision:
         d = RouteDecision("faq", 0.92, _AGENT_MAP["faq"], MODEL_FLASH)
         await _log_route(d)
         return d
+    # 航班状态查询先于「取消/改签」关键词，避免「查状态但不要改签」被误路由到订票专员
+    if any(k in text for k in ("航班", "延误", "登机", "PA", "NY")) and "状态" in text:
+        d = RouteDecision("flight_info", 0.85, _AGENT_MAP["flight_info"], MODEL_FLASH)
+        await _log_route(d)
+        return d
     if any(k in text for k in ("取消", "退票", "改签", "预订")) or (
         "订票" in text and "订单" not in text
     ):
@@ -88,10 +93,6 @@ async def classify_and_route(user_text: str) -> RouteDecision:
             await _log_route(d)
             return d
         d = RouteDecision("booking", 0.88, _AGENT_MAP["booking"], MODEL_PRO)
-        await _log_route(d)
-        return d
-    if any(k in text for k in ("航班", "延误", "登机", "PA", "NY")) and "状态" in text:
-        d = RouteDecision("flight_info", 0.85, _AGENT_MAP["flight_info"], MODEL_FLASH)
         await _log_route(d)
         return d
 
