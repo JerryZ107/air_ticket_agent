@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from uuid import UUID
 
@@ -13,6 +14,19 @@ from db.repository.bookings import Actor, booking_repo
 from db.repository.saga import RebookingSaga
 from pipeline.request_context import RequestContext, get_request_context, set_request_context
 from rag.retriever import rag_answer
+
+
+_SUB_QUESTION_RE = re.compile(r"[？?。;；]+")
+
+
+def _split_sub_questions(question: str) -> list[str]:
+    """复合问题拆分为子问题（按问号/句号/分号切分）。
+
+    例如「行李额度是多少？如果延误3小时以上有什么餐券？」拆为两个子问题
+    分别检索、合并证据，避免只命中一个主题导致漏答。单一问题返回原样。
+    """
+    parts = [p.strip() for p in _SUB_QUESTION_RE.split(question) if p.strip()]
+    return parts or [question.strip()]
 
 
 def _format_booking_lines(rows: list) -> list[str]:
@@ -44,28 +58,74 @@ async def resolve_actor(username: str) -> Actor:
 async def faq_lookup(question: str) -> str:
     await ensure_db()
     t0 = time.time()
-    answer, confidence, chunk_ids, rerank_log = await rag_answer(question)
-    ms = int((time.time() - t0) * 1000)
+    answers: list[str] = []
+    confidences: list[float] = []
+    all_chunk_ids: list[UUID] = []
+    all_rerank_logs: list[dict] = []
+    pool = get_pool()
     try:
         ctx = get_request_context()
-        pool = get_pool()
-        async with pool.acquire() as conn:
-            await conn.execute(
-                """
-                INSERT INTO obs.rag_queries (
-                    trace_id, question, final_chunk_ids, top_confidence, latency_ms, reranked_hits
-                )
-                VALUES ($1, $2, $3, $4, $5, $6::jsonb)
-                """,
-                ctx.trace_id,
-                question,
-                chunk_ids,
-                confidence,
-                ms,
-                json.dumps(rerank_log),
-            )
     except Exception:
-        pass
+        ctx = None
+    for sub in _split_sub_questions(question):
+        answer, confidence, chunk_ids, rerank_log = await rag_answer(sub)
+        if "手册未收录" in answer:
+            continue
+        answers.append(answer)
+        confidences.append(confidence)
+        all_chunk_ids.extend(chunk_ids)
+        all_rerank_logs.extend(rerank_log)
+        if ctx is not None:
+            try:
+                async with pool.acquire() as conn:
+                    await conn.execute(
+                        """
+                        INSERT INTO obs.rag_queries (
+                            trace_id, question, final_chunk_ids, top_confidence, latency_ms, reranked_hits
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+                        """,
+                        ctx.trace_id,
+                        sub,
+                        chunk_ids,
+                        confidence,
+                        int((time.time() - t0) * 1000),
+                        json.dumps(rerank_log),
+                    )
+            except Exception:
+                pass
+    if answers:
+        answer = "\n\n---\n\n".join(answers)
+        confidence = max(confidences)
+        chunk_ids = all_chunk_ids
+        rerank_log = all_rerank_logs
+    else:
+        from rag.retriever import NOT_FOUND_ANSWER
+
+        answer = NOT_FOUND_ANSWER
+        confidence = 0.0
+        chunk_ids = []
+        rerank_log = []
+    ms = int((time.time() - t0) * 1000)
+    if ctx is not None:
+        try:
+            async with pool.acquire() as conn:
+                await conn.execute(
+                    """
+                    INSERT INTO obs.rag_queries (
+                        trace_id, question, final_chunk_ids, top_confidence, latency_ms, reranked_hits
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+                    """,
+                    ctx.trace_id,
+                    question,
+                    chunk_ids,
+                    confidence,
+                    ms,
+                    json.dumps(rerank_log),
+                )
+        except Exception:
+            pass
     await _log_tool("faq_lookup", {"question": question}, answer, ms=ms)
     return answer
 

@@ -133,3 +133,11 @@ node_modules/
 # ui stuff
 
 ui/.next/
+
+# IDE / local settings
+.claude/
+.vscode/
+ui/tsconfig.tsbuildinfo
+
+# 旧版官方 Demo 截图（已过时，请用本项目真实 UI 截图替代）
+screenshot.jpg

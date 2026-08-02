@@ -19,7 +19,7 @@ from chatkit.types import (
 )
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from auth.dependencies import get_current_user, get_token_from_request
@@ -413,7 +413,17 @@ async def get_trace(
 
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
-    return {"status": "healthy"}
+    """健康检查：同时验证数据库连通性，避免'进程活着但业务全挂'的假健康。"""
+    try:
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            await conn.fetchval("SELECT 1")
+        return {"status": "healthy", "database": "ok"}
+    except Exception:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "database": "unreachable"},
+        )
 
 
 __all__ = [
