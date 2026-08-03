@@ -301,6 +301,10 @@ class AirlineServer(ChatKitServer[dict[str, Any]]):
             state.input_items.append({"content": user_text, "role": "user"})
 
         if user_text:
+            from pipeline.binder import preprocess_message
+
+            await preprocess_message(state.context, user_text)
+
             from pipeline.router import classify_and_route
 
             route = await classify_and_route(user_text)
@@ -390,11 +394,6 @@ class AirlineServer(ChatKitServer[dict[str, Any]]):
                     )
                     await self._broadcast_state(thread, context)
                     return
-
-            if state.context.user_id and route.target_agent != "FAQ Agent":
-                from airline.hydrate import hydrate_first_booking
-
-                await hydrate_first_booking(state.context)
 
             if not agent_breaker.allow():
                 busy = "系统繁忙，请稍后再试。"

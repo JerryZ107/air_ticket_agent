@@ -46,13 +46,3 @@ def create_airline_mcp_server() -> MCPServerStdio:
 def attach_mcp_server(server: MCPServerStdio, agents: list[Agent[AirlineAgentChatContext]]) -> None:
     for agent in agents:
         agent.mcp_servers = [server]
-
-
-def mcp_actor_hint(username: str | None) -> str:
-    if not USE_MCP_TOOLS or not username:
-        return ""
-    return (
-        f'\n当前会话已绑定登录用户 "{username}"（不可更改）。'
-        "查订单用 list_bookings；管理员查指定旅客用 list_customer_bookings。"
-        "写操作自动以会话身份执行；管理员代客须传 on_behalf_of_username=旅客用户名。\n"
-    )

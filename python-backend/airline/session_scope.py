@@ -36,8 +36,11 @@ def normalize_on_behalf_of_username(
     context: RunContextWrapper[AirlineAgentChatContext],
     on_behalf_of_username: str | None,
 ) -> str | None:
-    """非管理员不得代客；管理员可传旅客 username，空则仅表示管理员本人会话。"""
+    """非管理员不得代客；管理员可传旅客 username，空则使用 Binder 预提取的代客目标（若有）。"""
     if on_behalf_of_username is None or not str(on_behalf_of_username).strip():
+        bound = context.context.state.on_behalf_of_username
+        if bound and is_admin_session(context):
+            return bound
         return None
     target = str(on_behalf_of_username).strip()
     if not is_admin_session(context):

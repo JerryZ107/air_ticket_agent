@@ -385,7 +385,7 @@ async def list_customer_bookings_tool(
     name_override="get_trip_details",
     description_override=(
         "已登录用户：列出其订单并写入上下文（用户问「我的订单/有无订票/查行程」且未给确认号时必须调用）。"
-        "未登录或演示剧本：根据城市关键词加载示例联程。"
+        "未登录或演示剧本：读取 Binder 已注入的示例行程。"
     ),
 )
 async def get_trip_details(
@@ -404,14 +404,9 @@ async def get_trip_details(
         if rows:
             apply_booking_row(context.context.state, rows[0])
         return bookings
-    text = message.lower()
-    keywords = ["paris", "new york", "austin", "巴黎", "纽约", "奥斯汀"]
-    scenario_key = "disrupted" if any(k in text for k in keywords) else "on_time"
-    apply_itinerary_defaults(context.context.state, scenario_key=scenario_key)
+    # 未登录演示路径：场景已由 Binder 在入口预选并注入，这里只读取
+    apply_itinerary_defaults(context.context.state)
     ctx = context.context.state
-    if scenario_key == "disrupted":
-        ctx.origin = ctx.origin or "Paris (CDG)"
-        ctx.destination = ctx.destination or "Austin (AUS)"
     segments = ctx.itinerary or []
     segment_summaries = []
     for seg in segments:
@@ -420,10 +415,10 @@ async def get_trip_details(
             f"状态: {seg.get('status')}"
         )
     summary = "；".join(segment_summaries) if segment_summaries else "暂无航段详情"
-    label = "延误联程" if scenario_key == "disrupted" else "正常航班"
+    label = "延误联程" if ctx.scenario == "disrupted" else "正常航班"
     return (
-        f"已加载{label}行程：航班 {ctx.flight_number}，确认号 {ctx.confirmation_number}，"
-        f"出发 {ctx.origin}，目的地 {ctx.destination}。{summary}"
+        f"已加载{label}行程：航班 {ctx.flight_number or '未知'}，确认号 {ctx.confirmation_number or '未知'}，"
+        f"出发 {ctx.origin or '未知'}，目的地 {ctx.destination or '未知'}。{summary}"
     )
 
 

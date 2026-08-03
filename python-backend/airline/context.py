@@ -16,6 +16,8 @@ class AirlineAgentContext(BaseModel):
     username: str | None = None
     user_role: str | None = None
     trace_id: str | None = None
+    bookings: list[dict[str, str]] | None = None  # Binder 注入的全部订单快照（内部）
+    on_behalf_of_username: str | None = None  # Binder 提取的 admin 代客目标（内部）
     itinerary: list[dict[str, str]] | None = None  # Internal only (not surfaced to UI)
     baggage_claim_id: str | None = None  # Internal only (not surfaced to UI)
     compensation_case_id: str | None = None
@@ -57,6 +59,8 @@ def public_context(ctx: AirlineAgentContext) -> dict:
         "scenario",
         "user_id",
         "trace_id",
+        "bookings",
+        "on_behalf_of_username",
     }
     for key in list(data.keys()):
         if key in hidden_keys:

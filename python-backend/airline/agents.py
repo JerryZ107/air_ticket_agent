@@ -13,7 +13,6 @@ from .demo_data import apply_itinerary_defaults
 from .guardrails import jailbreak_guardrail, relevance_guardrail
 from .hydrate import hydrate_first_booking
 from .grounding import STRICT_GROUNDING
-from .mcp_integration import mcp_actor_hint
 from .tools import (
     assign_special_service_seat,
     book_new_flight,
@@ -37,21 +36,35 @@ _ZH = "请始终使用简体中文与客户交流。\n" + STRICT_GROUNDING + "\n
 def _admin_on_behalf_hint(ctx: AirlineAgentChatContext) -> str:
     if ctx.user_role != "admin":
         return ""
+    target = ctx.on_behalf_of_username
+    if target:
+        return (
+            f"\n你是管理员会话。系统已识别代客目标旅客：{target}，"
+            "本次写操作将以该旅客身份自动执行（工具已绑定），确认号必须属于该旅客；"
+            "审计会记录 on_behalf_of。\n"
+        )
     return (
         "\n你是管理员会话：list_bookings 列出全库最近订单（含旅客用户名）；"
         "查某一旅客用 list_customer_bookings(customer_username=...)。"
-        "代客取消/改签/换座时必须在工具中传入 on_behalf_of_username=旅客用户名，"
-        "并与确认号所属旅客一致；写操作会记入 audit on_behalf_of。\n"
+        "如需代客办理，请直接说明旅客用户名（例如「代旅客 lisi 取消订单」），系统会自动绑定身份。\n"
     )
 
 
 def _login_booking_hint(ctx: AirlineAgentChatContext) -> str:
     if not ctx.username:
         return ""
+    count = len(ctx.bookings or [])
+    if count:
+        booking_line = (
+            f"系统已注入 {count} 笔订单数据（当前订单：确认号 {ctx.confirmation_number or '无'}，"
+            f"航班 {ctx.flight_number or '无'}，座位 {ctx.seat_number or '未分配'}）。"
+        )
+    else:
+        booking_line = "系统已注入订单数据：该账户当前无订单。"
     return (
-        f"\n客户已登录（{ctx.username}），订单与写操作工具已绑定该账户。"
-        f"若确认号未知，先调用 list_bookings 或 get_trip_details，勿索要确认号；"
-        f"列表为空时再说明无订单。\n"
+        f"\n客户已登录（{ctx.username}）。{booking_line}"
+        "描述订单时仅可引用注入的数据；若客户提到注入数据之外的订单，再调用 list_bookings 获取最新列表；"
+        "无订单时明确告知。\n"
     )
 
 
@@ -67,14 +80,13 @@ def seat_services_instructions(
         f"{_ZH}"
         "你是选座与特殊服务专员，负责处理选座变更及医疗/特殊服务请求。\n"
         f"1. 客户确认号为 {confirmation}，航班 {flight}，当前座位 {seat}。"
-        "若信息缺失则先 list_bookings 再办理；若已有信息则直接办理，并记录特殊需求。\n"
+        "信息已由系统注入，直接办理并记录特殊需求；若客户提到注入数据之外的订单，再 list_bookings。\n"
         "2. 可提供座位图或记录具体座位。前排/医疗需求用 assign_special_service_seat，"
         "普通换座用 update_seat；若客户想可视化选座，调用 display_seat_map。\n"
         "3. 确认新座位并告知已保存至确认号。\n"
         "重要：请求明确且数据齐全时，可在同一轮连续调用多个工具，无需等待用户回复。"
         "完成后最多转接一次：若需延误补偿支持则转退款与补偿专员，否则返回分诊客服。\n"
         "若与选座或特殊服务无关，转回分诊客服。"
-        f"{mcp_actor_hint(ctx.username)}"
         f"{_login_booking_hint(ctx)}"
         f"{_admin_on_behalf_hint(ctx)}"
     )
@@ -103,15 +115,14 @@ def flight_information_instructions(
         f"{RECOMMENDED_PROMPT_PREFIX}\n"
         f"{_ZH}"
         "你是航班信息专员，提供航班状态、联程风险及备选方案。\n"
-        f"1. 确认号 {confirmation}，航班 {flight}。未知时先 list_bookings；有数据时不要阻塞。\n"
+        f"1. 确认号 {confirmation}，航班 {flight}。订单信息已由系统注入，直接使用，不要阻塞。\n"
         "2. 立即使用 flight_status_tool 查询并告知当前状态（你拥有该工具，禁止声称'没有工具'或'无法查询'），"
         "并说明延误是否导致错过后续联程。\n"
         "3. 若延误或取消影响行程，调用 search_flights（或 get_matching_flights）提供备选，再转订票改签专员完成改签。\n"
-        "4. 已登录时描述「客户订单」必须先 list_bookings，仅引用工具返回的确认号，禁止编造或混用演示行程。\n"
+        "4. 描述「客户订单」仅引用系统注入的订单数据，禁止编造或混用演示行程。\n"
         "5. 禁止向客户描述'转接/移交/联系同事/专员'等内部过程；只查询并直接回答，需要后续业务时再转接。\n"
         "自主执行：可链式调用多个工具，数据齐全时每条消息只转接一次，无需等待用户确认。"
         "若客户询问行李、退款等，单次转接至对应专员。"
-        f"{mcp_actor_hint(ctx.username)}"
         f"{_login_booking_hint(ctx)}"
         f"{_admin_on_behalf_hint(ctx)}"
     )
@@ -140,14 +151,14 @@ def booking_cancellation_instructions(
         f"{RECOMMENDED_PROMPT_PREFIX}\n"
         f"{_ZH}"
         "你是订票改签专员，负责取消、预订或改签。\n"
-        f"1. 基于确认号 {confirmation} 和航班 {flight} 办理；未知时先 list_bookings，齐全则直接操作。\n"
+        f"1. 基于系统注入的确认号 {confirmation} 和航班 {flight} 直接办理；"
+        "若客户提到注入数据之外的订单，再 list_bookings。\n"
         "2. 客户需新航班时，先 search_flights 查备选；有确认号改签用 rebook_flight（确认号不变），"
         "全新预订可用 book_new_flight。\n"
         "3. 取消时确认详情后使用 cancel_flight（须 actor_username）；订座偏好可转选座专员。\n"
         "4. 总结变更内容，告知更新后的确认号与座位。\n"
         "自主执行：数据齐全时同一轮可多次调用工具，每条消息只转接一次。"
         "改签后优先转选座专员（有座位偏好）或退款与补偿专员（遇延误），否则回分诊客服。"
-        f"{mcp_actor_hint(ctx.username)}"
         f"{_login_booking_hint(ctx)}"
         f"{_admin_on_behalf_hint(ctx)}"
     )
@@ -176,12 +187,11 @@ def refunds_compensation_instructions(
         f"{RECOMMENDED_PROMPT_PREFIX}\n"
         f"{_ZH}"
         "你是退款与补偿专员，帮助客户了解并获取延误补偿。\n"
-        f"1. 基于确认号 {confirmation} 办理；未知时先 list_bookings。\n"
+        f"1. 基于系统注入的确认号 {confirmation} 办理。\n"
         "2. 若遇延误或错过后续航班，先用 faq_lookup_tool 查询补偿政策，"
         f"再汇总问题并用 issue_compensation 创建案例、发放酒店/餐券。当前案例号：{case_id}。\n"
         "3. 说明已发放内容及需保留的单据；完成后回分诊客服。\n"
         "自主执行：数据齐全时链式调用工具，每条消息只转接一次。"
-        f"{mcp_actor_hint(ctx.username)}"
         f"{_login_booking_hint(ctx)}"
         f"{_admin_on_behalf_hint(ctx)}"
     )
@@ -211,7 +221,6 @@ def faq_instructions(
         "2. 必须调用 faq_lookup_tool；仅根据返回内容用中文回答。\n"
         "3. 若返回含「手册未收录」或「未检索到」，原样告知客户手册暂无该信息，禁止猜测。\n"
         "4. 若需补偿或行李协助，可提议转接对应专员（不要描述内部转接过程）。"
-        f"{mcp_actor_hint(run_context.context.state.username)}"
     )
 
 
@@ -233,8 +242,8 @@ def triage_instructions(
     if ctx.username:
         login_block = (
             f"客户已登录（{ctx.username}）。若询问自己的订单、有无订票、行程或确认号且未提供编号，"
-            f"必须先调用 get_trip_details，用工具结果直接中文回答；"
-            f"仅列单即可时不要转专员。无订单则明确告知。\n"
+            f"直接基于系统注入的订单数据中文回答；"
+            f"仅列单时不要转专员。无订单则明确告知。\n"
         )
     if ctx.user_role == "admin":
         login_block += (
@@ -249,15 +258,9 @@ def triage_instructions(
         "选座与特殊服务专员（选座）、常见问题专员（政策）、"
         "退款与补偿专员（延误补偿）。\n"
         f"{login_block}"
-        + (
-            ""
-            if ctx.username
-            else "若消息提及巴黎/纽约/奥斯汀且上下文缺失，先调用 get_trip_details 填充航班/确认号。"
-        )
         + "请求明确时立即转接，让专员自主完成多步操作，不要在每步工具调用后要求用户确认。"
         "每条消息最多转接一次：最多做一次准备（一个工具调用）然后转接。"
         "禁止向客户描述'转接/移交/联系同事/专员'等内部过程，直接以客服口吻继续服务。"
-        f"{mcp_actor_hint(ctx.username)}"
         f"{_admin_on_behalf_hint(ctx)}"
     )
 
