@@ -55,6 +55,10 @@ async def classify_and_route(user_text: str) -> RouteDecision:
             "有没有订单",
             "查询下我的",
             "查看一下我",
+            "我最近的订单",
+            "最近的订单",
+            "展示下我",
+            "我的行程",
         )
     ):
         d = RouteDecision("chitchat", 0.93, "Triage Agent", MODEL_FLASH)

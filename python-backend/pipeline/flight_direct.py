@@ -9,8 +9,6 @@ from __future__ import annotations
 import re
 from typing import Final
 
-from services import tool_facade as api
-
 _FLIGHT_RE = re.compile(
     r"(?<![A-Za-z0-9])([A-Z]{2}\s?\d{2,4})(?![A-Za-z0-9])",
     re.IGNORECASE,
@@ -34,6 +32,8 @@ def _zh_status(raw: str) -> str:
 
 async def answer_flight_status(question: str) -> str | None:
     """命中航班号则基于 flight_status 工具结果直接回答；未命中返回 None 交回 Agent。"""
+    from services import tool_facade as api
+
     m = _FLIGHT_RE.search(question)
     if not m:
         return None

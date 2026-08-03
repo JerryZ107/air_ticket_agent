@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import time
 from uuid import UUID
 
@@ -14,19 +13,7 @@ from db.repository.bookings import Actor, booking_repo
 from db.repository.saga import RebookingSaga
 from pipeline.request_context import RequestContext, get_request_context, set_request_context
 from rag.retriever import rag_answer
-
-
-_SUB_QUESTION_RE = re.compile(r"[？?。;；]+")
-
-
-def _split_sub_questions(question: str) -> list[str]:
-    """复合问题拆分为子问题（按问号/句号/分号切分）。
-
-    例如「行李额度是多少？如果延误3小时以上有什么餐券？」拆为两个子问题
-    分别检索、合并证据，避免只命中一个主题导致漏答。单一问题返回原样。
-    """
-    parts = [p.strip() for p in _SUB_QUESTION_RE.split(question) if p.strip()]
-    return parts or [question.strip()]
+from rag.text_utils import split_sub_questions
 
 
 def _format_booking_lines(rows: list) -> list[str]:
@@ -67,7 +54,7 @@ async def faq_lookup(question: str) -> str:
         ctx = get_request_context()
     except Exception:
         ctx = None
-    for sub in _split_sub_questions(question):
+    for sub in split_sub_questions(question):
         answer, confidence, chunk_ids, rerank_log = await rag_answer(sub)
         if "手册未收录" in answer:
             continue
