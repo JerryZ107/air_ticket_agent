@@ -1,46 +1,95 @@
-# 航班订票智能客服 Agent
+# ✈️ 航班订票智能客服 Agent
 
-基于 OpenAI Agents SDK 的 **Python 航班订票助理**：真实 PostgreSQL 订单、**RAG 订票手册**、多专员 Agent 编排、可观测与审计。适用于本地演示、作品集与中小团队 PoC，**不是**开箱即用的 SaaS。
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
+![License](https://img.shields.io/github/license/JerryZ107/air_ticket_agent)
+![CI](https://github.com/JerryZ107/air_ticket_agent/actions/workflows/ci.yml/badge.svg)
+![Eval](https://img.shields.io/badge/E2E%20Eval-37%2F37-brightgreen)
+![RAG](https://img.shields.io/badge/RAG%20Recall%403-100%25-brightgreen)
+
+基于 **OpenAI Agents SDK** 的航空公司智能客服系统：多 Agent 编排 + 混合检索 RAG + 真实 PostgreSQL 业务层 + RBAC 权限 + Saga 事务 + 全链路可观测，并自带一套**可量化、可自动复现**的评测体系。
+
+> 这是一个简历作品集项目（阶段 A：本地演示 / 作品集；阶段 B：可上线 PoC），不是开箱即用的 SaaS。设计决策记录在 [`docs/adr/`](docs/adr/) 与 [`content.md`](content.md)。
 
 ---
 
-## 功能概览
+## 亮点（简历速览）
 
 | 能力 | 说明 |
 |------|------|
-| **多 Agent 分诊** | 分诊、航班信息、订票改签、选座、FAQ、延误补偿等专员，支持 Handoff |
-| **业务工具** | 查单、航班状态、搜航班、退改签、换座等，经 `services/tool_facade.py` 统一访问数据库 |
-| **RAG 政策问答** | `docs/manual` 手册 → 按标题切块 → 关键词 + BM25 + 向量 + Rerank；高置信 FAQ 路由可直连检索结果 |
-| **登录与权限** | JWT / Cookie；普通用户仅能操作本人订单；`admin` 可全库列表、`list_customer_bookings` 代查旅客 |
-| **严守工具与手册** | 订单/状态以工具返回为准；政策以手册检索为准；未收录须明确「无法确认」 |
-| **可观测 `obs`** | Trace、LLM 调用、工具入出、对话全文、路由决策、护栏、审计日志（见 `db/obs_schema.sql`） |
-| **前端** | Next.js + ChatKit 双栏（对话 + Runner 轨迹）；另提供 `/api/chat` 便于国内批量测试 |
+| **多 Agent 编排** | 1 个分诊 Agent + 5 个专员（航班信息 / 订退改 / 选座特殊服务 / FAQ / 退款补偿），Handoff 转接；写操作 Agent 用 Pro 模型，其余用 Flash 模型分层 |
+| **确定性直连路径** | 高置信 FAQ 与航班状态查询**绕过 Agent 直接调工具**：省 token、零旁白、结果稳定（航班状态查询实测 20–300ms） |
+| **混合检索 RAG** | 17 篇中文订票手册 → 标题切块 → 关键词 + PostgreSQL tsvector BM25 + BGE-M3 向量 → 轻量 Rerank → 置信度/词覆盖双阈值拒答；复合问题自动拆分子检索 |
+| **真实数据层 + 权限** | PostgreSQL + asyncpg；登录/JWT + RBAC 硬校验（repository 层，非 prompt 层）；普通用户只能操作本人订单，admin 可代客并写审计；防枚举统一回复「无法处理该确认号」 |
+| **改签 Saga** | 确认号不变，事务内原子扣减余票 + 状态快照 + 步骤留痕 + 失败补偿回滚，从规则上消灭「先退后订」的中间态 |
+| **全链路可观测 `obs`** | 每次请求一个 trace_id：LLM 请求/响应/思考全文、工具出入参、RAG 各阶段命中、对话全文、审计日志、护栏检查、熔断事件、路由决策全部落库 |
+| **工程韧性** | 相关性 + 越狱检测输入护栏（fail-open + 全量审计）、Agent 熔断器、上下文滑窗 + 摘要压缩、登录限流 |
+| **自动化评测** | 37 题端到端批量测试 + RAG 金标 Recall + 越权/会话隔离/Saga 验收，全部可一键复现（见下） |
 
 ---
 
-## 架构简图
+## 架构
 
-```
-┌─────────────┐     ┌──────────────────────────────────────────┐
-│  ui (3000)  │────▶│  python-backend (8001)                    │
-│  ChatKit    │     │  FastAPI · Agents SDK · pipeline/router   │
-└─────────────┘     │       │                    │               │
-                    │       ▼                    ▼               │
-                    │  airline/tools      rag/retriever          │
-                    │       │                    │               │
-                    │       └──────┬─────────────┘               │
-                    │              ▼                             │
-                    │     services/tool_facade                   │
-                    │              ▼                             │
-                    │     db/repository  +  obs (审计/日志)      │
-                    └──────────────────┬─────────────────────────┘
-                                       ▼
-                              PostgreSQL (pgvector)
+```mermaid
+flowchart LR
+    U["用户 / Next.js + ChatKit 前端"] -->|"/chatkit"| API["FastAPI"]
+    API --> R["pipeline/router 意图路由"]
+    R -->|高置信 FAQ| FD["FAQ 直连"]
+    R -->|高置信航班状态| SD["航班状态直连"]
+    R --> T["Triage Agent"]
+    T -->|Handoff| A1["航班信息专员"]
+    T -->|Handoff| A2["订票改签专员"]
+    T -->|Handoff| A3["选座/特殊服务专员"]
+    T -->|Handoff| A4["FAQ 专员"]
+    T -->|Handoff| A5["退款补偿专员"]
+    A1 & A2 & A3 & A4 & A5 --> G["输入护栏：相关性 + 越狱检测"]
+    A1 & A2 & A3 --> TF["services/tool_facade"]
+    TF --> REP["db/repository：bookings / saga / auth"]
+    REP --> PG[("PostgreSQL public 业务库")]
+    A4 & FD --> RAG["rag/retriever 混合检索 + Rerank"]
+    RAG --> PG
+    API --> OBS[("PostgreSQL obs 观测库")]
 ```
 
-- **业务表**：`public.*`（`db/schema.sql` + `db/seed.sql`）
-- **观测表**：`obs.*`（`db/obs_schema.sql`）
-- **可选 MCP**：stdio 子进程仅暴露 **写操作**（取消/改签/换座）；读操作与会话绑定走本地 `function_tool`（默认 **关闭 MCP**，见下文）
+一次完整请求的时序：
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant API as FastAPI
+    participant Router as 意图路由
+    participant Agent as 专员 Agent
+    participant Tool as tool_facade
+    participant DB as PostgreSQL
+    U->>API: 登录 + 消息
+    API->>Router: classify_and_route()
+    Router-->>API: intent + 置信度
+    alt 高置信 FAQ / 航班状态
+        API->>Tool: 确定性直连
+    else
+        API->>Agent: Runner.run_streamed()
+        Agent->>Tool: function_tool 调用
+        Tool->>DB: 权限校验 + SQL / Saga 事务
+        DB-->>Tool: 结果
+        Tool-->>Agent: 工具输出
+    end
+    API->>DB: 写入 trace / LLM / tool / audit
+    API-->>U: 流式回复 + Runner 轨迹（前端可视）
+```
+
+---
+
+## 评测结果（2026-08-03 实测）
+
+| 验收项 | 结果 | 复现方式 |
+|--------|------|----------|
+| 37 题端到端批量（RAG / 工具 / 权限 / admin 代客 / 分诊） | **37/37 通过，启发式检查零问题** | `python scripts/run_ques_batch.py && python scripts/analyze_ques_results.py` |
+| RAG 金标 Recall@3（50 条） | **100%**（门槛 ≥ 85%） | `python eval/run_eval.py` |
+| 越权 / 权限用例 | 3/3 | 同上 |
+| 会话隔离 | 8/8 | 同上 |
+| 改签 Saga（确认号不变） | 1/1 | 同上 |
+| 航班状态直连延迟 | 20–300ms，零旁白 | 批量结果 `elapsed_ms` |
+
+CI 会在每次 push 时自动运行单测 + 数据库集成测试（详见 [.github/workflows/ci.yml](.github/workflows/ci.yml)）。
 
 ---
 
@@ -53,23 +102,17 @@ docker compose up -d
 ```
 
 - PostgreSQL：`localhost:5432`，库名 `airline`，用户/密码 `airline` / `airline`
-- Adminer：http://localhost:8080（可选，查表）
+- Adminer（可选）：http://localhost:8080
 
 ### 2. 配置环境变量
 
-在 `python-backend/.env` 或项目根 `.env` 中配置（勿提交真实密钥）：
+复制 `.env.example` 为 `.env`（**勿提交真实密钥**）：
 
 ```env
 DEEPSEEK_API_KEY=你的密钥
-# 或 OPENAI_API_KEY + OPENAI_BASE_URL
-
 DATABASE_URL=postgresql://airline:airline@localhost:5432/airline
-
-# 嵌入模型（默认本地 BGE-M3，首次启动会下载）
-EMBEDDING_BACKEND=local
+EMBEDDING_BACKEND=local   # 本地 BGE-M3，首次启动自动下载
 EMBEDDING_DEVICE=cpu
-
-# 多用户生产建议保持 false（工具身份绑 HTTP 登录会话）
 AIRLINE_USE_MCP_TOOLS=false
 ```
 
@@ -81,7 +124,7 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8001
 ```
 
-启动时会自动：索引 `docs/manual`、补全向量（若可用）。
+启动时自动索引 `docs/manual` 并补齐向量。
 
 ### 4. 启动前端
 
@@ -93,144 +136,70 @@ npm run dev
 
 浏览器打开 http://localhost:3000/login
 
-**Windows 一键**（Docker + 后端 + 前端各开窗口）：
+Windows 一键脚本：`.\scripts\start_demo.ps1`
 
-```powershell
-.\scripts\start_demo.ps1
-```
+健康检查：`curl http://127.0.0.1:8001/health`（含数据库连通性，DB 不可用时返回 503）
 
-### 5. 健康检查
-
-```bash
-curl http://127.0.0.1:8001/health
-```
-
----
-
-## 演示账号
+### 演示账号
 
 | 用户名 | 密码 | 说明 |
 |--------|------|------|
-| `zhangsan` | `demo123` | 旅客；订单确认号 **ABC123**（NY900） |
-| `lisi` | `demo123` | 旅客；订单 **XYZ789**（NY802，种子数据可能为已取消） |
-| `admin` | `demo123` | 管理员；可查全库最近订单、代查指定旅客 |
+| `zhangsan` | `demo123` | 旅客；订单 **ABC123**（NY900） |
+| `lisi` | `demo123` | 旅客；订单 **XYZ789**（NY802，可能为已取消） |
+| `admin` | `demo123` | 管理员；全库列表 + `list_customer_bookings` 代查 |
 
 ---
 
-## API 摘要
-
-| 接口 | 说明 |
-|------|------|
-| `POST /api/auth/login` | 登录，返回 token（同时写 Cookie） |
-| `POST /api/chat` | 简易对话（Bearer token），适合脚本批量测 |
-| `POST /chatkit` | ChatKit 流式协议（前端使用） |
-| `GET /api/trace/{trace_id}` | 查看单次请求的 trace / LLM / tool（本人或 admin） |
-
----
-
-## 测试与评测
-
-### 批量业务问答（`ques.md`）
+## 测试与 CI
 
 ```bash
-# 需先启动后端；默认 37 题（跳过 destructive 写操作）
+# 单元 + 数据库集成测试（自动跳过无数据库用例）
+python -m pytest -q
+
+# 端到端批量（需后端运行；默认跳过写操作）
 python scripts/run_ques_batch.py
 
-# 含退改签等写操作（慎用，会改库）
-python scripts/run_ques_batch.py --include-destructive
+# RAG 检索诊断
+python scripts/diagnose_rag.py
 
-# 只跑部分题
-python scripts/run_ques_batch.py --id-prefix R
+# 全套验收（RAG 金标 / 越权 / 会话 / Saga）
+python eval/run_eval.py
 ```
 
-结果：`eval/ques_batch_results.json`；启发式分析：`python scripts/analyze_ques_results.py`
-
-### 打印 QA 日志（数据库 + 批量结果）
-
-```bash
-python scripts/qa.py
-python scripts/qa.py --id M07 A04
-```
-
-对话持久化在 `obs.chat_messages`（`/api/chat` 会写入 user/assistant 与 `trace_id`）。
-
-### RAG
-
-```bash
-python scripts/diagnose_rag.py          # 单题检索诊断
-python scripts/embed_manual.py          # 重索引手册
-python eval/run_eval.py                 # 金标 Recall（见 eval/）
-```
-
----
-
-## MCP（可选）
-
-本仓库 MCP 为 **B 阶段薄壳**：与 `tool_facade` 共用领域逻辑，**不是**对外远程 MCP 产品。
-
-| 项 | 说明 |
-|----|------|
-| 默认 | `AIRLINE_USE_MCP_TOOLS=false`，全部走本地 `function_tool`，**按登录用户绑会话** |
-| 开启后 | `main.py` 拉起 stdio 子进程；仅 **订票/选座专员** 挂载 MCP；工具为 `cancel_flight`、`rebook_flight`、`update_seat` |
-| 身份 | 子进程依赖 `AIRLINE_SESSION_USERNAME` 或调试变量 `AIRLINE_MCP_ACTOR`，**不适合多用户并发** |
-| 独立运行 | `cd python-backend && python -m mcp_server` |
-| Cursor 配置 | 参考 `docs/mcp-cursor.json` |
-
-远程 MCP + OAuth 2.1 未实现；生产多用户请用 **HTTP JWT + 本地工具** 路径。
+GitHub Actions 使用 `pgvector/pgvector:pg16` 服务容器自动初始化 schema + seed，每次 push 自动跑测试（[ci.yml](.github/workflows/ci.yml)）。
 
 ---
 
 ## 项目结构
 
 ```
-openai-cs-agents-demo-main/
-├── python-backend/          # FastAPI、Agent、RAG、auth、pipeline
-│   ├── airline/             # agents、tools、context、grounding
-│   ├── rag/                 # 切块、检索、rerank
-│   ├── mcp_server/          # 可选 MCP 写操作
+├── python-backend/          # FastAPI · Agents SDK · pipeline
+│   ├── airline/             # agents / tools / guardrails / session 绑定
+│   ├── pipeline/            # 意图路由 / 直连路径 / 上下文压缩 / 熔断
+│   ├── rag/                 # 切块 / 混合检索 / rerank
+│   ├── mcp_server/          # 可选 MCP 写操作薄壳
 │   ├── services/tool_facade.py
 │   └── main.py
-├── ui/                      # Next.js 前端
-├── db/                      # schema、obs、seed、迁移
-├── docs/manual/             # RAG 订票手册 Markdown
-├── scripts/                 # 批量测试、qa.py、诊断脚本
-├── eval/                    # 批量结果与分析、金标
-├── ques.md                  # 批量问题集 JSON
-├── docker-compose.yml
-├── RUNBOOK.md               # 运维与 RAG/MCP 补充说明
-└── content.md               # 架构决议与实现记录（Grilling）
+├── ui/                      # Next.js + ChatKit（对话 + Runner 轨迹）
+├── db/                      # schema / seed / obs / migrations
+├── docs/                    # 手册语料 + ADR 决策记录
+├── scripts/                 # 批量测试 / 诊断 / 一键启动
+├── eval/                    # 金标集 + 验收脚本 + 结果
+└── tests/                   # pytest 单测 + DB 集成测试
 ```
 
----
+## 路线图（A → B）
 
-## 上线前注意（中小团队 PoC）
+| 阶段 A（当前） | 阶段 B（可上线 PoC） |
+|----------------|----------------------|
+| 账号密码登录 + RBAC | OAuth 2.1 / MFA / SSO |
+| docker-compose 本地跑 | 云部署 + 监控告警 |
+| 50 条 RAG 金标 + CI | 线上反馈闭环（`obs.rag_feedback`） |
+| 工具层 RBAC + 审计 | 完整权限模型 + 多租户 |
+| 本地 trace / 观测库 | 生产级可观测大盘 |
 
-- 更换演示密码、启用 HTTPS、`COOKIE_SECURE=1`
-- 生产关闭或严格限制写操作与 `destructive` 批量题
-- 手册更新后执行重索引与 `ques` 回归
-- 数据库备份与 `obs` 留存策略
-- 详见此前讨论的 P0：CI 门禁、health 含 DB、降级与人工兜底
+## 许可
 
----
+MIT（源自 OpenAI CS Agents Demo 的演进实现，用于学习与演示；演示数据与手册内容不代表任何真实航司政策）。
 
-## 相关文档
-
-- [RUNBOOK.md](RUNBOOK.md) — 本地运行、RAG 环境变量、MCP 细节
-- [ques.md](ques.md) — 批量测试题与类别
-- [eval/A04_optimization.md](eval/A04_optimization.md) — 管理员代查旅客示例立项
-- [docs/manual/README.md](docs/manual/README.md) — 手册编写说明
-
----
-
-## 技术栈
-
-- Python 3.11+、FastAPI、OpenAI Agents SDK、asyncpg、pgvector
-- 嵌入：sentence-transformers（BGE-M3 等，可配置）
-- LLM：DeepSeek / OpenAI 兼容接口（`llm_config.py`）
-- 前端：Next.js、ChatKit
-
----
-
-## 许可与声明
-
-源于 OpenAI CS Agents Demo 的演进实现，用于学习与演示。演示数据与手册内容不代表任何真实航司政策；生产使用需自行合规审查与接口对接。
+English version: [README.en.md](README.en.md)
