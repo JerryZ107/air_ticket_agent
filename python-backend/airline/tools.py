@@ -190,7 +190,9 @@ async def update_seat(
 
 @function_tool(
     name_override="cancel_flight",
-    description_override="取消订单。管理员代客时须传 on_behalf_of_username 与确认号。",
+    description_override=(
+        "取消订单。确认号须属于会话绑定账户；管理员代客目标由系统自动绑定，无需传身份参数。"
+    ),
 )
 async def cancel_flight(
     context: RunContextWrapper[AirlineAgentChatContext],
@@ -384,7 +386,7 @@ async def list_customer_bookings_tool(
 @function_tool(
     name_override="get_trip_details",
     description_override=(
-        "已登录用户：列出其订单并写入上下文（用户问「我的订单/有无订票/查行程」且未给确认号时必须调用）。"
+        "已登录用户：返回系统注入的全部订单快照（入口 Binder 已注入，无需重复查询）。"
         "未登录或演示剧本：读取 Binder 已注入的示例行程。"
     ),
 )
@@ -392,8 +394,23 @@ async def get_trip_details(
     context: RunContextWrapper[AirlineAgentChatContext], message: str
 ) -> str:
     if is_logged_in(context):
-        actor = require_session_actor(context)
         uname = require_session_username(context)
+        state = context.context.state
+        rows = state.bookings or []
+        if rows:
+            lines = []
+            for b in rows:
+                owner = f"旅客{b.get('owner_username')} " if b.get("owner_username") else ""
+                lines.append(
+                    f"{owner}{b.get('confirmation_no')} {b.get('flight_no')} "
+                    f"{b.get('origin')}->{b.get('destination')} "
+                    f"座位{b.get('seat')} ({b.get('status')})"
+                )
+            out = "订单列表：" + "；".join(lines)
+            await _log_tool("get_trip_details", {"message": message, "session_user": uname}, out)
+            return out
+        # 防御：入口未注入（历史会话/直连调用）时回退查询并刷新状态
+        actor = require_session_actor(context)
         bookings = await api.list_bookings(uname)
         await _log_tool("get_trip_details", {"message": message, "session_user": uname}, bookings)
         if "未找到订单" in bookings:

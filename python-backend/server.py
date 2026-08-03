@@ -345,9 +345,33 @@ class AirlineServer(ChatKitServer[dict[str, Any]]):
                     await self._broadcast_state(thread, context)
                     return
 
+            # 管理员全库最近/全部订单：Binder 已在入口注入快照，直接确定性直答
+            # （可规则化路由 → 绕过 Agent，省 token、零旁白、结果稳定）
+            if state.context.user_role == "admin" and user_text:
+                from pipeline.admin_recent import (
+                    format_admin_recent_orders,
+                    is_admin_recent_orders,
+                )
+
+                if is_admin_recent_orders(user_text):
+                    admin_reply = format_admin_recent_orders(state.context)
+                    if admin_reply:
+                        state.input_items.append({"role": "assistant", "content": admin_reply})
+                        yield ThreadItemDoneEvent(
+                            item=AssistantMessageItem(
+                                id=self.store.generate_item_id("message", thread, context),
+                                thread_id=thread.id,
+                                created_at=datetime.now(),
+                                content=[AssistantMessageContent(text=admin_reply)],
+                            )
+                        )
+                        await self._broadcast_state(thread, context)
+                        return
+
             if route.confidence >= 0.85 and route.target_agent:
                 state.current_agent_name = route.target_agent
 
+            # 兜底：注入数据缺失（历史会话）时仍可回退到订票专员走 list_bookings
             if (
                 state.context.user_role == "admin"
                 and "订单" in user_text

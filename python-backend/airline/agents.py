@@ -44,8 +44,9 @@ def _admin_on_behalf_hint(ctx: AirlineAgentChatContext) -> str:
             "审计会记录 on_behalf_of。\n"
         )
     return (
-        "\n你是管理员会话：list_bookings 列出全库最近订单（含旅客用户名）；"
-        "查某一旅客用 list_customer_bookings(customer_username=...)。"
+        "\n你是管理员会话：系统已注入全库最近订单数据（含旅客用户名），"
+        "查最近/全部订单直接引用注入数据，不要重复调用工具；"
+        "查指定旅客订单用 list_customer_bookings(customer_username=...)。"
         "如需代客办理，请直接说明旅客用户名（例如「代旅客 lisi 取消订单」），系统会自动绑定身份。\n"
     )
 
@@ -63,7 +64,8 @@ def _login_booking_hint(ctx: AirlineAgentChatContext) -> str:
         booking_line = "系统已注入订单数据：该账户当前无订单。"
     return (
         f"\n客户已登录（{ctx.username}）。{booking_line}"
-        "描述订单时仅可引用注入的数据；若客户提到注入数据之外的订单，再调用 list_bookings 获取最新列表；"
+        "描述订单时仅可引用注入的数据；系统已注入该账户全部订单，"
+        "仅当本会话刚完成订票/改签/取消、需要刷新最新状态时，才调用 list_bookings。"
         "无订单时明确告知。\n"
     )
 
@@ -247,8 +249,9 @@ def triage_instructions(
         )
     if ctx.user_role == "admin":
         login_block += (
-            "管理员查全库最近订单须转订票改签专员并调用 list_bookings，"
-            "或查指定旅客用 list_customer_bookings。仅列单时不要多余转接。\n"
+            "管理员查全库最近/全部订单由系统直接回答（数据已注入），不要调用工具；"
+            "查指定旅客订单转订票改签专员并调用 list_customer_bookings。"
+            "仅列单时不要多余转接。\n"
         )
     return (
         f"{RECOMMENDED_PROMPT_PREFIX} "

@@ -59,7 +59,7 @@ async def cancel_flight(
     confirmation_number: str,
     on_behalf_of_username: str | None = None,
 ) -> str:
-    """取消订单；管理员代客时传 on_behalf_of_username。"""
+    """取消订单；会话身份绑定 AIRLINE_SESSION_USERNAME，管理员代客目标经校验后绑定。"""
     user = _session_username()
     trace_id = await _with_trace(user, "/mcp/cancel_flight")
     try:
@@ -75,7 +75,7 @@ async def rebook_flight(
     new_seat: str = "自动分配",
     on_behalf_of_username: str | None = None,
 ) -> str:
-    """改签（确认号不变）；管理员代客时传 on_behalf_of_username。"""
+    """改签（确认号不变）；会话身份绑定 AIRLINE_SESSION_USERNAME，管理员代客目标经校验后绑定。"""
     user = _session_username()
     trace_id = await _with_trace(user, "/mcp/rebook_flight")
     try:
@@ -96,7 +96,7 @@ async def update_seat(
     new_seat: str,
     on_behalf_of_username: str | None = None,
 ) -> str:
-    """更新座位；管理员代客时传 on_behalf_of_username。"""
+    """更新座位；会话身份绑定 AIRLINE_SESSION_USERNAME，管理员代客目标经校验后绑定。"""
     user = _session_username()
     trace_id = await _with_trace(user, "/mcp/update_seat")
     try:
