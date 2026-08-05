@@ -49,6 +49,9 @@ from memory_store import MemoryStore
 from pipeline.circuit_breaker import agent_breaker
 
 
+MAX_HANDOFFS_PER_TURN = 4  # 代码级安全网：单轮转接超上限强制回分诊，防止转接环烧钱
+
+
 class AgentEvent(BaseModel):
     id: str
     type: str
@@ -143,6 +146,7 @@ class ConversationState:
     current_agent_name: str = triage_agent.name
     events: List[AgentEvent] = field(default_factory=list)
     guardrails: List[GuardrailCheck] = field(default_factory=list)
+    handoff_count: int = 0  # 本轮用户消息内的转接次数（代码级上限，替代 prompt 里的"最多转接一次"）
 
 
 class AirlineServer(ChatKitServer[dict[str, Any]]):
@@ -255,7 +259,24 @@ class AirlineServer(ChatKitServer[dict[str, Any]]):
                         timestamp=now_ms,
                     )
                 )
-                active_agent = item.target_agent.name
+                state = self._state_for_thread(thread_id)
+                state.handoff_count += 1
+                if state.handoff_count > MAX_HANDOFFS_PER_TURN:
+                    state.events.append(
+                        AgentEvent(
+                            id=uuid4().hex,
+                            type="handoff_cap",
+                            agent=item.source_agent.name,
+                            content=(
+                                f"单轮转接超过 {MAX_HANDOFFS_PER_TURN} 次，"
+                                "强制回到分诊客服（代码级安全网，不再依赖 prompt 约束）"
+                            ),
+                            timestamp=now_ms,
+                        )
+                    )
+                    active_agent = triage_agent.name
+                else:
+                    active_agent = item.target_agent.name
             elif isinstance(item, ToolCallItem):
                 tool_name = getattr(item.raw_item, "name", None)
                 raw_args = getattr(item.raw_item, "arguments", None)
@@ -301,6 +322,7 @@ class AirlineServer(ChatKitServer[dict[str, Any]]):
             state.input_items.append({"content": user_text, "role": "user"})
 
         if user_text:
+            state.handoff_count = 0
             from pipeline.binder import preprocess_message
 
             await preprocess_message(state.context, user_text)
@@ -559,6 +581,8 @@ class AirlineServer(ChatKitServer[dict[str, Any]]):
         except Exception:
             pass
         state.current_agent_name = final_agent_name
+        if state.handoff_count > MAX_HANDOFFS_PER_TURN:
+            state.current_agent_name = triage_agent.name
         state.guardrails = self._record_guardrails(
             agent_name=state.current_agent_name,
             input_text=user_text,

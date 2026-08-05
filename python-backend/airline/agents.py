@@ -87,7 +87,7 @@ def seat_services_instructions(
         "普通换座用 update_seat；若客户想可视化选座，调用 display_seat_map。\n"
         "3. 确认新座位并告知已保存至确认号。\n"
         "重要：请求明确且数据齐全时，可在同一轮连续调用多个工具，无需等待用户回复。"
-        "完成后最多转接一次：若需延误补偿支持则转退款与补偿专员，否则返回分诊客服。\n"
+        "如需延误补偿支持则转退款与补偿专员，否则返回分诊客服。\n"
         "若与选座或特殊服务无关，转回分诊客服。"
         f"{_login_booking_hint(ctx)}"
         f"{_admin_on_behalf_hint(ctx)}"
@@ -123,8 +123,8 @@ def flight_information_instructions(
         "3. 若延误或取消影响行程，调用 search_flights（或 get_matching_flights）提供备选，再转订票改签专员完成改签。\n"
         "4. 描述「客户订单」仅引用系统注入的订单数据，禁止编造或混用演示行程。\n"
         "5. 禁止向客户描述'转接/移交/联系同事/专员'等内部过程；只查询并直接回答，需要后续业务时再转接。\n"
-        "自主执行：可链式调用多个工具，数据齐全时每条消息只转接一次，无需等待用户确认。"
-        "若客户询问行李、退款等，单次转接至对应专员。"
+        "自主执行：可链式调用多个工具，数据齐全时直接链式执行，无需等待用户确认。"
+        "若客户询问行李、退款等，转接至对应专员。"
         f"{_login_booking_hint(ctx)}"
         f"{_admin_on_behalf_hint(ctx)}"
     )
@@ -153,13 +153,15 @@ def booking_cancellation_instructions(
         f"{RECOMMENDED_PROMPT_PREFIX}\n"
         f"{_ZH}"
         "你是订票改签专员，负责取消、预订或改签。\n"
+        "0. 政策、规则、流程、费用类问题先用 faq_lookup_tool 查询订票手册，查清后再判断是否执行操作；"
+        "禁止凭行业常识或自身知识回答政策问题。\n"
         f"1. 基于系统注入的确认号 {confirmation} 和航班 {flight} 直接办理；"
         "若客户提到注入数据之外的订单，再 list_bookings。\n"
         "2. 客户需新航班时，先 search_flights 查备选；有确认号改签用 rebook_flight（确认号不变），"
         "全新预订可用 book_new_flight。\n"
         "3. 取消时确认详情后使用 cancel_flight（须 actor_username）；订座偏好可转选座专员。\n"
         "4. 总结变更内容，告知更新后的确认号与座位。\n"
-        "自主执行：数据齐全时同一轮可多次调用工具，每条消息只转接一次。"
+        "自主执行：数据齐全时同一轮可多次调用工具，直接完成链路。"
         "改签后优先转选座专员（有座位偏好）或退款与补偿专员（遇延误），否则回分诊客服。"
         f"{_login_booking_hint(ctx)}"
         f"{_admin_on_behalf_hint(ctx)}"
@@ -173,7 +175,14 @@ booking_cancellation_agent = Agent[AirlineAgentChatContext](
     instructions=booking_cancellation_instructions,
     tools=tools_for_agent(
         "booking_cancellation_agent",
-        [cancel_flight, get_matching_flights, book_new_flight, rebook_flight_tool, list_bookings_tool],
+        [
+            cancel_flight,
+            get_matching_flights,
+            book_new_flight,
+            rebook_flight_tool,
+            list_bookings_tool,
+            faq_lookup_tool,
+        ],
     ),
     input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
@@ -193,7 +202,7 @@ def refunds_compensation_instructions(
         "2. 若遇延误或错过后续航班，先用 faq_lookup_tool 查询补偿政策，"
         f"再汇总问题并用 issue_compensation 创建案例、发放酒店/餐券。当前案例号：{case_id}。\n"
         "3. 说明已发放内容及需保留的单据；完成后回分诊客服。\n"
-        "自主执行：数据齐全时链式调用工具，每条消息只转接一次。"
+        "自主执行：数据齐全时链式调用工具，直接完成链路。"
         f"{_login_booking_hint(ctx)}"
         f"{_admin_on_behalf_hint(ctx)}"
     )
@@ -262,7 +271,6 @@ def triage_instructions(
         "退款与补偿专员（延误补偿）。\n"
         f"{login_block}"
         + "请求明确时立即转接，让专员自主完成多步操作，不要在每步工具调用后要求用户确认。"
-        "每条消息最多转接一次：最多做一次准备（一个工具调用）然后转接。"
         "禁止向客户描述'转接/移交/联系同事/专员'等内部过程，直接以客服口吻继续服务。"
         f"{_admin_on_behalf_hint(ctx)}"
     )
