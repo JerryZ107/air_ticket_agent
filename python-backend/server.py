@@ -331,20 +331,9 @@ class AirlineServer(ChatKitServer[dict[str, Any]]):
             from pipeline.router import classify_and_route
 
             route = await classify_and_route(user_text)
-            if route.confidence < 0.7 and route.clarify_question:
-                clarify = route.clarify_question
-                state.input_items.append({"role": "assistant", "content": clarify})
-                yield ThreadItemDoneEvent(
-                    item=AssistantMessageItem(
-                        id=self.store.generate_item_id("message", thread, context),
-                        thread_id=thread.id,
-                        created_at=datetime.now(),
-                        content=[AssistantMessageContent(text=clarify)],
-                    )
-                )
-                await self._broadcast_state(thread, context)
-                return
 
+            # 确定性直答优先：admin 查指定旅客 / 查全库最近订单，规则命中直接返回，
+            # 不因路由低置信度的澄清追问而丢失（admin 订单类问题先于 clarify 判断）
             if (
                 state.context.user_role == "admin"
                 and user_text
@@ -390,6 +379,20 @@ class AirlineServer(ChatKitServer[dict[str, Any]]):
                         )
                         await self._broadcast_state(thread, context)
                         return
+
+            if route.confidence < 0.7 and route.clarify_question:
+                clarify = route.clarify_question
+                state.input_items.append({"role": "assistant", "content": clarify})
+                yield ThreadItemDoneEvent(
+                    item=AssistantMessageItem(
+                        id=self.store.generate_item_id("message", thread, context),
+                        thread_id=thread.id,
+                        created_at=datetime.now(),
+                        content=[AssistantMessageContent(text=clarify)],
+                    )
+                )
+                await self._broadcast_state(thread, context)
+                return
 
             if route.confidence >= 0.85 and route.target_agent:
                 state.current_agent_name = route.target_agent

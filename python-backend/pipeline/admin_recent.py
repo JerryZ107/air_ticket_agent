@@ -8,7 +8,12 @@ state.bookings（admin 见全部用户最近 50 条）。本模块按规则命�
 
 from __future__ import annotations
 
+import re
+
 from airline.context import AirlineAgentContext
+
+
+_CUSTOMER_NAME_RE = re.compile(r"(?:旅客|用户|客户|乘客)\s*[a-zA-Z][a-zA-Z0-9_]*")
 
 
 def is_admin_recent_orders(text: str) -> bool:
@@ -16,8 +21,11 @@ def is_admin_recent_orders(text: str) -> bool:
     t = text.strip()
     if not t:
         return False
-    # 指定旅客/本人订单不走此路径
-    if any(k in t for k in ("旅客", "用户", "客户", "乘客", "我")):
+    # 本人订单不走此路径
+    if "我" in t:
+        return False
+    # 指定旅客（旅客X/用户X…）交给 admin_customer；"旅客用户名"这类泛指不影响直答
+    if _CUSTOMER_NAME_RE.search(t):
         return False
     return "订单" in t and any(k in t for k in ("最近", "列出", "全部", "全库", "列表"))
 

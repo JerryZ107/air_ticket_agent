@@ -9,6 +9,7 @@ def test_admin_recent_orders_matching():
     assert is_admin_recent_orders("查一下全库最近订单")
     assert is_admin_recent_orders("全部订单列出来")
     assert is_admin_recent_orders("订单列表")
+    assert is_admin_recent_orders("列出系统里最近订单，并说明每条订单属于哪位旅客用户名")
     assert not is_admin_recent_orders("代旅客lisi取消订单")
     assert not is_admin_recent_orders("查旅客lisi的订单")
     assert not is_admin_recent_orders("我最近的订单")

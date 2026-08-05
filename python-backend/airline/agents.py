@@ -43,8 +43,8 @@ def _admin_on_behalf_hint(ctx: AirlineAgentChatContext) -> str:
             "审计会记录 on_behalf_of。\n"
         )
     return (
-        "\n你是管理员会话：系统已注入全库最近订单数据（含旅客用户名），"
-        "查最近/全部订单直接引用注入数据，不要重复调用工具；"
+        "\n你是管理员会话：系统已注入全库最近订单数据，查最近/全部订单由系统直答；"
+        "需要最新或更完整的订单详情（含旅客用户名）时，调用 list_bookings 获取最新列表；"
         "查指定旅客订单用 list_customer_bookings(customer_username=...)。"
         "如需代客办理，请直接说明旅客用户名（例如「代旅客 lisi 取消订单」），系统会自动绑定身份。\n"
     )
