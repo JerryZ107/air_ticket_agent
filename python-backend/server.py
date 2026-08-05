@@ -309,6 +309,7 @@ class AirlineServer(ChatKitServer[dict[str, Any]]):
         context: dict[str, Any],
     ) -> AsyncIterator[ThreadStreamEvent]:
         state = self._state_for_thread(thread.id)
+        entry_guardrail_check: GuardrailCheck | None = None
         user_text = ""
         user = context.get("user")
         if user is not None:
@@ -440,6 +441,45 @@ class AirlineServer(ChatKitServer[dict[str, Any]]):
                     )
                     await self._broadcast_state(thread, context)
                     return
+
+            # 入口护栏：合并相关性+越狱一次判定，规则前置省模型调用；
+            # 只在本轮即将进 Agent 时跑一次，转接/后续 Agent 不再重复
+            from airline.guardrails import run_entry_guardrail
+
+            guard = await run_entry_guardrail(user_text)
+            entry_guardrail_check = GuardrailCheck(
+                id=uuid4().hex,
+                name="入口护栏（相关性+越狱）",
+                input=user_text,
+                reasoning=guard.reasoning,
+                passed=guard.passed,
+                timestamp=time.time() * 1000,
+            )
+            if not guard.passed:
+                state.guardrails = [entry_guardrail_check]
+                refusal = "抱歉，我只能回答与航空出行相关的问题。"
+                state.input_items.append({"role": "assistant", "content": refusal})
+                yield ThreadItemDoneEvent(
+                    item=AssistantMessageItem(
+                        id=self.store.generate_item_id("message", thread, context),
+                        thread_id=thread.id,
+                        created_at=datetime.now(),
+                        content=[AssistantMessageContent(text=refusal)],
+                    )
+                )
+                try:
+                    from db.observability import obs_writer
+                    from pipeline.request_context import get_request_context
+
+                    rctx = get_request_context()
+                    for g in state.guardrails:
+                        await obs_writer.log_guardrail(
+                            rctx.trace_id, g.name, g.input, g.passed, g.reasoning, span_id=None
+                        )
+                except Exception:
+                    pass
+                await self._broadcast_state(thread, context)
+                return
 
             if not agent_breaker.allow():
                 busy = "系统繁忙，请稍后再试。"
@@ -588,6 +628,8 @@ class AirlineServer(ChatKitServer[dict[str, Any]]):
             input_text=user_text,
             guardrail_results=result.input_guardrail_results,
         )
+        if entry_guardrail_check is not None:
+            state.guardrails = [entry_guardrail_check] + state.guardrails
         try:
             from db.observability import obs_writer
             from pipeline.request_context import get_request_context

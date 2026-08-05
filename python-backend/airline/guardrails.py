@@ -177,3 +177,112 @@ async def jailbreak_guardrail(
         JailbreakOutput,
         tripwire_when=lambda o: not o.is_safe,
     )
+
+
+# ---------------------------------------------------------------------------
+# 入口护栏（合并相关性 + 越狱，一次判定；规则前置省模型调用）
+# ---------------------------------------------------------------------------
+
+_AIRLINE_KEYWORDS = (
+    "航班", "机票", "订票", "退票", "改签", "选座", "座位", "行李", "值机", "登机",
+    "延误", "补偿", "退款", "政策", "订单", "航司", "机场", "登机口", "联程", "中转",
+    "舱位", "里程", "会员", "客服", "人工", "电话", "邮箱", "确认号", "护照",
+    "常旅客", "优惠", "特价", "准点", "候机",
+)
+_GREETINGS = ("你好", "您好", "谢谢", "感谢", "好的", "请问", "在吗", "再见", "拜拜")
+_SUSPICIOUS = (
+    "忽略", "系统提示词", "提示词", "泄露", "密码", "越狱", "绕过", "扮演",
+    "admin", "sql", "注入", "hack", "黑客", "口令", "隐藏指令", "system prompt",
+)
+
+
+def _needs_guardrail_model(user_text: str) -> bool:
+    """规则前置：命中可疑词必须过模型；命中航空词/寒暄直接放行；否则交给模型判断。"""
+    t = user_text.strip().lower()
+    if any(k in t for k in _SUSPICIOUS):
+        return True
+    if any(k in t for k in _AIRLINE_KEYWORDS) or any(k in t for k in _GREETINGS):
+        return False
+    return True
+
+
+class EntryGuardrailOutput(BaseModel):
+    reasoning: str
+    is_relevant: bool
+    is_safe: bool
+
+
+class EntryGuardrailResult:
+    def __init__(self, passed: bool, reasoning: str, checked_by_model: bool) -> None:
+        self.passed = passed
+        self.reasoning = reasoning
+        self.checked_by_model = checked_by_model
+
+
+_ENTRY_INSTRUCTIONS = (
+    _RELEVANCE_INSTRUCTIONS
+    + "\n"
+    + _JAILBREAK_INSTRUCTIONS
+    + "\n综合两项判断，只输出一行 JSON（不要 markdown）："
+    '{"reasoning":"...", "is_relevant":true, "is_safe":true}'
+)
+
+if USE_DEEPSEEK:
+    entry_guardrail_agent = Agent(
+        model=GUARDRAIL_MODEL,
+        name="入口护栏",
+        instructions=_ENTRY_INSTRUCTIONS,
+    )
+else:
+    entry_guardrail_agent = Agent(
+        model=GUARDRAIL_MODEL,
+        name="入口护栏",
+        instructions=_ENTRY_INSTRUCTIONS,
+        output_type=EntryGuardrailOutput,
+    )
+
+
+def _parse_entry_output(text: str) -> EntryGuardrailOutput:
+    """解析入口护栏 JSON；解析失败 fail-open（默认相关且安全）。"""
+    raw = str(text or "").strip()
+    if not raw:
+        return EntryGuardrailOutput(reasoning="护栏模型返回空内容，默认通过。", is_relevant=True, is_safe=True)
+    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
+    if fenced:
+        raw = fenced.group(1)
+    else:
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if match:
+            raw = match.group(0)
+    try:
+        return EntryGuardrailOutput.model_validate(json.loads(raw))
+    except (json.JSONDecodeError, ValueError):
+        return EntryGuardrailOutput(
+            reasoning=f"无法解析 JSON，默认放行：{raw[:120]}",
+            is_relevant=True,
+            is_safe=True,
+        )
+
+
+async def run_entry_guardrail(user_text: str) -> EntryGuardrailResult:
+    """入口护栏：规则前置放行 → 需要时一次模型调用判定（相关性 + 越狱 合并）。"""
+    if not _needs_guardrail_model(user_text):
+        return EntryGuardrailResult(
+            passed=True,
+            reasoning="规则前置：命中航空/寒暄关键词，直接放行。",
+            checked_by_model=False,
+        )
+    try:
+        result = await Runner.run(entry_guardrail_agent, user_text)
+        if USE_DEEPSEEK:
+            out = _parse_entry_output(result.final_output)
+        else:
+            out = result.final_output_as(EntryGuardrailOutput)
+        passed = out.is_relevant and out.is_safe
+        return EntryGuardrailResult(passed=passed, reasoning=out.reasoning, checked_by_model=True)
+    except Exception as exc:
+        return EntryGuardrailResult(
+            passed=True,
+            reasoning=f"护栏执行异常，默认放行：{exc}",
+            checked_by_model=True,
+        )

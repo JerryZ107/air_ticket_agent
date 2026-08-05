@@ -10,7 +10,6 @@ from llm_config import MODEL, MODEL_FLASH, MODEL_PRO
 
 from .context import AirlineAgentChatContext
 from .demo_data import apply_itinerary_defaults
-from .guardrails import jailbreak_guardrail, relevance_guardrail
 from .hydrate import hydrate_first_booking
 from .grounding import STRICT_GROUNDING
 from .tools import (
@@ -103,7 +102,6 @@ seat_special_services_agent = Agent[AirlineAgentChatContext](
         "seat_special_services_agent",
         [update_seat, assign_special_service_seat, display_seat_map],
     ),
-    input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
 
 
@@ -139,7 +137,6 @@ flight_information_agent = Agent[AirlineAgentChatContext](
         "flight_information_agent",
         [flight_status_tool, get_matching_flights],
     ),
-    input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
 
 
@@ -184,7 +181,6 @@ booking_cancellation_agent = Agent[AirlineAgentChatContext](
             faq_lookup_tool,
         ],
     ),
-    input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
 
 
@@ -217,7 +213,6 @@ refunds_compensation_agent = Agent[AirlineAgentChatContext](
         "refunds_compensation_agent",
         [issue_compensation, faq_lookup_tool],
     ),
-    input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
 
 
@@ -241,7 +236,6 @@ faq_agent = Agent[AirlineAgentChatContext](
     handoff_description="解答政策、行李、座位、补偿等常见问题。",
     instructions=faq_instructions,
     tools=tools_for_agent("faq_agent", [faq_lookup_tool]),
-    input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
 
 
@@ -283,7 +277,6 @@ triage_agent = Agent[AirlineAgentChatContext](
     instructions=triage_instructions,
     tools=tools_for_agent("triage_agent", [get_trip_details, list_customer_bookings_tool]),
     handoffs=[],
-    input_guardrails=[relevance_guardrail, jailbreak_guardrail],
 )
 
 
