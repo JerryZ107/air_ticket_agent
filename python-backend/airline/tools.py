@@ -191,7 +191,8 @@ async def update_seat(
 @function_tool(
     name_override="cancel_flight",
     description_override=(
-        "取消订单。确认号须属于会话绑定账户；管理员代客目标由系统自动绑定，无需传身份参数。"
+        "取消订单。确认号须属于会话绑定账户；管理员代客目标由系统自动识别并绑定，"
+        "也可显式传 on_behalf_of_username。"
     ),
 )
 async def cancel_flight(

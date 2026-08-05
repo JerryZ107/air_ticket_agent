@@ -13,6 +13,12 @@ from pipeline.binder import (
 def test_extract_on_behalf_of_username():
     assert extract_on_behalf_of_username("代旅客lisi取消订单") == "lisi"
     assert extract_on_behalf_of_username("旅客 ZhangSan 的订单") == "zhangsan"
+    assert extract_on_behalf_of_username("帮lisi取消订单") == "lisi"
+    assert extract_on_behalf_of_username("给zhangsan改签到NY900") == "zhangsan"
+    assert extract_on_behalf_of_username("lisi的订单有哪些") == "lisi"
+    assert extract_on_behalf_of_username("查一下 lisi 名下订单") == "lisi"
+    assert extract_on_behalf_of_username("NY900现在什么状态") is None
+    assert extract_on_behalf_of_username("NY900的订单情况") is None
     assert extract_on_behalf_of_username("查一下我的订单") is None
     assert extract_on_behalf_of_username("") is None
 
